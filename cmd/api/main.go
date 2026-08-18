@@ -12,6 +12,7 @@ import (
 	"github.com/salhe123/forge/internal/apps"
 	"github.com/salhe123/forge/internal/config"
 	"github.com/salhe123/forge/internal/db"
+	"github.com/salhe123/forge/internal/deploy"
 	httpserver "github.com/salhe123/forge/internal/httpserver"
 )
 
@@ -41,9 +42,10 @@ func main() {
 	}
 
 	store := apps.NewStore(pool)
+	deploys := deploy.NewService(store, deploy.DockerRunner{})
 	srv := &http.Server{
 		Addr:              cfg.HTTPAddr,
-		Handler:           httpserver.New(pool, store).Handler(),
+		Handler:           httpserver.New(pool, store, deploys).Handler(),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 

@@ -12,19 +12,22 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/salhe123/forge/internal/apps"
+	"github.com/salhe123/forge/internal/deploy"
 )
 
 type Server struct {
 	router *chi.Mux
 	pool   *pgxpool.Pool
 	apps   *apps.Store
+	deploy *deploy.Service
 }
 
-func New(pool *pgxpool.Pool, store *apps.Store) *Server {
+func New(pool *pgxpool.Pool, store *apps.Store, deploys *deploy.Service) *Server {
 	s := &Server{
 		router: chi.NewRouter(),
 		pool:   pool,
 		apps:   store,
+		deploy: deploys,
 	}
 	s.routes()
 	return s
@@ -48,6 +51,7 @@ func (s *Server) routes() {
 		r.Get("/", s.listApps)
 		r.Post("/", s.createApp)
 		r.Get("/{id}", s.getApp)
+		r.Post("/{id}/deploy", s.deployApp)
 	})
 }
 
@@ -108,6 +112,24 @@ func (s *Server) getApp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, app)
+}
+
+func (s *Server) deployApp(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	app, err := s.deploy.Start(r.Context(), id)
+	if errors.Is(err, apps.ErrNotFound) {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "app not found"})
+		return
+	}
+	if errors.Is(err, apps.ErrNoImage) {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "image is required to deploy"})
+		return
+	}
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "could not start deploy"})
+		return
+	}
+	writeJSON(w, http.StatusAccepted, app)
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {

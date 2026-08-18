@@ -38,9 +38,11 @@ CREATE TABLE IF NOT EXISTS apps (
     repo_url TEXT NOT NULL DEFAULT '',
     image TEXT NOT NULL DEFAULT '',
     status TEXT NOT NULL DEFAULT 'registered',
+    last_error TEXT NOT NULL DEFAULT '',
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+ALTER TABLE apps ADD COLUMN IF NOT EXISTS last_error TEXT NOT NULL DEFAULT '';
 `
 	if _, err := pool.Exec(ctx, schema); err != nil {
 		return fmt.Errorf("migrate: %w", err)

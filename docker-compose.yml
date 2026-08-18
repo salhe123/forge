@@ -23,6 +23,10 @@ services:
     environment:
       HTTP_ADDR: :8080
       DATABASE_URL: postgres://forge:forge@postgres:5432/forge?sslmode=disable
+      DOCKER_HOST: unix:///var/run/docker.sock
+    user: "0:0"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
     ports:
       - "8080:8080"
 

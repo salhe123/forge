@@ -8,6 +8,7 @@ type App struct {
 	RepoURL   string    `json:"repo_url"`
 	Image     string    `json:"image"`
 	Status    string    `json:"status"`
+	LastError string    `json:"last_error,omitempty"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }

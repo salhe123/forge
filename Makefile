@@ -1,7 +1,7 @@
 APP=forge
 GO=go
 
-.PHONY: tidy test run docker-up docker-down
+.PHONY: tidy test run cli install docker-up docker-down
 
 tidy:
 	$(GO) mod tidy
@@ -14,8 +14,12 @@ run:
 	HTTP_ADDR=$${HTTP_ADDR:-:8080} \
 	$(GO) run ./cmd/api
 
-docker-up:
-	docker compose up --build
+cli:
+	$(GO) run ./cmd/forge $(ARGS)
+
+install:
+	$(GO) install ./cmd/forge
+
 
 docker-down:
 	docker compose down

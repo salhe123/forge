@@ -13,6 +13,7 @@ import (
 
 var ErrNotFound = errors.New("app not found")
 var ErrConflict = errors.New("app already exists")
+var ErrUnAuthorized = errors.New("unauthorized")
 
 type Store struct {
 	pool *pgxpool.Pool

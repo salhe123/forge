@@ -25,6 +25,7 @@ This is milestone 1: a production-shaped backend you can register apps against. 
 | POST | `/v1/apps` | register an app |
 | GET | `/v1/apps` | list apps |
 | GET | `/v1/apps/{id}` | get one app |
+| POST | `/v1/apps/{id}/deploy` | run the app image with Docker |
 
 ### Register an app
 
@@ -65,9 +66,25 @@ internal/httpserver  routes
 .github/workflows  CI
 ```
 
+### Deploy an app
+
+Runs `docker run -d --name forge-<app>` using the stored `image`. Status goes `deploying` → `running` or `failed`.
+
+Run the API with Compose (Docker socket is mounted so Forge can start containers on the host engine):
+
+```bash
+docker compose up --build
+```
+
+```bash
+# after POST /v1/apps, use the returned id
+curl -s -X POST localhost:8080/v1/apps/<id>/deploy
+curl -s localhost:8080/v1/apps/<id>
+docker ps --filter name=forge-
+```
+
 ## Next (together)
 
-1. Deploy worker (run container / k8s job from `image`)
-2. `forge` CLI (`serve`, `apps list`)
-3. OpenTelemetry traces
-4. Helm chart + kind
+1. `forge` CLI (`serve`, `apps list`, `deploy`)
+2. Versioned SQL migrations
+3. Helm chart + kind

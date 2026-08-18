@@ -13,7 +13,9 @@ import (
 
 var ErrNotFound = errors.New("app not found")
 var ErrConflict = errors.New("app already exists")
-var ErrUnAuthorized = errors.New("unauthorized")
+var ErrNoImage = errors.New("app image is required")
+
+const appCols = `id::text, name, repo_url, image, status, last_error, created_at, updated_at`
 
 type Store struct {
 	pool *pgxpool.Pool
@@ -23,16 +25,18 @@ func NewStore(pool *pgxpool.Pool) *Store {
 	return &Store{pool: pool}
 }
 
+func scanApp(row interface{ Scan(dest ...any) error }) (App, error) {
+	var app App
+	err := row.Scan(&app.ID, &app.Name, &app.RepoURL, &app.Image, &app.Status, &app.LastError, &app.CreatedAt, &app.UpdatedAt)
+	return app, err
+}
+
 func (s *Store) Create(ctx context.Context, in CreateAppInput) (App, error) {
-	const q = `
+	q := `
 INSERT INTO apps (name, repo_url, image)
 VALUES ($1, $2, $3)
-RETURNING id::text, name, repo_url, image, status, created_at, updated_at
-`
-	var app App
-	err := s.pool.QueryRow(ctx, q, in.Name, in.RepoURL, in.Image).Scan(
-		&app.ID, &app.Name, &app.RepoURL, &app.Image, &app.Status, &app.CreatedAt, &app.UpdatedAt,
-	)
+RETURNING ` + appCols
+	app, err := scanApp(s.pool.QueryRow(ctx, q, in.Name, in.RepoURL, in.Image))
 	if isUniqueViolation(err) {
 		return App{}, ErrConflict
 	}
@@ -43,11 +47,7 @@ RETURNING id::text, name, repo_url, image, status, created_at, updated_at
 }
 
 func (s *Store) List(ctx context.Context) ([]App, error) {
-	const q = `
-SELECT id::text, name, repo_url, image, status, created_at, updated_at
-FROM apps
-ORDER BY created_at DESC
-`
+	q := `SELECT ` + appCols + ` FROM apps ORDER BY created_at DESC`
 	rows, err := s.pool.Query(ctx, q)
 	if err != nil {
 		return nil, fmt.Errorf("list apps: %w", err)
@@ -56,8 +56,8 @@ ORDER BY created_at DESC
 
 	out := make([]App, 0)
 	for rows.Next() {
-		var app App
-		if err := rows.Scan(&app.ID, &app.Name, &app.RepoURL, &app.Image, &app.Status, &app.CreatedAt, &app.UpdatedAt); err != nil {
+		app, err := scanApp(rows)
+		if err != nil {
 			return nil, fmt.Errorf("scan app: %w", err)
 		}
 		out = append(out, app)
@@ -66,20 +66,29 @@ ORDER BY created_at DESC
 }
 
 func (s *Store) Get(ctx context.Context, id string) (App, error) {
-	const q = `
-SELECT id::text, name, repo_url, image, status, created_at, updated_at
-FROM apps
-WHERE id = $1
-`
-	var app App
-	err := s.pool.QueryRow(ctx, q, id).Scan(
-		&app.ID, &app.Name, &app.RepoURL, &app.Image, &app.Status, &app.CreatedAt, &app.UpdatedAt,
-	)
+	q := `SELECT ` + appCols + ` FROM apps WHERE id = $1`
+	app, err := scanApp(s.pool.QueryRow(ctx, q, id))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return App{}, ErrNotFound
 	}
 	if err != nil {
 		return App{}, fmt.Errorf("get app: %w", err)
+	}
+	return app, nil
+}
+
+func (s *Store) UpdateStatus(ctx context.Context, id, status, lastError string) (App, error) {
+	q := `
+UPDATE apps
+SET status = $2, last_error = $3, updated_at = now()
+WHERE id = $1
+RETURNING ` + appCols
+	app, err := scanApp(s.pool.QueryRow(ctx, q, id, status, lastError))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return App{}, ErrNotFound
+	}
+	if err != nil {
+		return App{}, fmt.Errorf("update status: %w", err)
 	}
 	return app, nil
 }
